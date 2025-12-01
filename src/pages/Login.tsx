@@ -1,19 +1,44 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "lucide-react";
+import { Calendar, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { isSuccessResult } from "@/types/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - redirect to dashboard
-    navigate("/dashboard");
+
+    const result = await login({ email, password });
+
+    if (isSuccessResult(result)) {
+      toast({
+        title: "Welcome back!",
+        description: `Logged in as ${result.data.firstName} ${result.data.lastName}`,
+      });
+      navigate("/dashboard");
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: result.error?.message || "Invalid credentials",
+      });
+    }
+  };
+
+  // Pre-fill test credentials helper
+  const fillTestCredentials = () => {
+    setEmail("john.owner@example.com");
+    setPassword("password123");
   };
 
   return (
@@ -39,6 +64,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -50,10 +76,18 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
-            <Button type="submit" className="w-full">
-              Log In
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                "Log In"
+              )}
             </Button>
           </form>
 
@@ -69,6 +103,27 @@ const Login = () => {
           <Button type="button" variant="outline" className="w-full">
             Continue with Google
           </Button>
+
+          {/* Test credentials helper - visible in dev mode */}
+          <div className="pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center mb-2">
+              Test Account (Development)
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full text-xs"
+              onClick={fillTestCredentials}
+            >
+              Fill Test Credentials
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Email: john.owner@example.com
+              <br />
+              Password: any password works
+            </p>
+          </div>
         </div>
 
         <div className="text-center text-sm">
