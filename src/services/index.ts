@@ -84,6 +84,7 @@ export {
   confirmBooking,
   completeBooking,
   markBookingNoShow,
+  deleteBooking,
   getTodayBookings,
   getUpcomingBookings,
 } from './booking.service';

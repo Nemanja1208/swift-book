@@ -18,7 +18,7 @@ import {
   BookingStatus,
   Customer,
 } from '@/types';
-import { apiGet, apiPost, apiPut, apiPatch, isMockMode } from './api-client';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, isMockMode } from './api-client';
 import { mockStore } from './mock-store';
 
 // ============================================
@@ -419,6 +419,17 @@ function mockMarkNoShow(businessId: string, bookingId: string): OperationResult<
   return createSuccessResult(updatedBooking!);
 }
 
+function mockDeleteBooking(businessId: string, bookingId: string): OperationResult<null> {
+  const index = mockStore.bookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+
+  if (index === -1) {
+    return createNotFoundResult('Booking');
+  }
+
+  mockStore.bookings.splice(index, 1);
+  return createSuccessResult(null);
+}
+
 // ============================================
 // Booking Service Functions
 // ============================================
@@ -549,6 +560,18 @@ export async function markBookingNoShow(
   }
 
   return apiPatch<Booking>(BOOKING_ENDPOINTS.NO_SHOW(businessId, bookingId));
+}
+
+export async function deleteBooking(
+  businessId: string,
+  bookingId: string
+): Promise<OperationResult<null>> {
+  if (isMockMode()) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return mockDeleteBooking(businessId, bookingId);
+  }
+
+  return apiDelete<null>(BOOKING_ENDPOINTS.BY_ID(businessId, bookingId));
 }
 
 // ============================================

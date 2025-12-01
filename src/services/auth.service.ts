@@ -1,7 +1,7 @@
 import { OperationResult, createSuccessResult, createErrorResult, ErrorCodes } from '@/types/api';
 import { User, LoginRequest, LoginResponse, RegisterRequest, RefreshTokenRequest } from '@/types';
-import { apiPost, setTokens, clearTokens, isMockMode } from './api-client';
-import { mockUsers, mockCurrentUser } from './mock-data';
+import { apiPost, setTokens, clearTokens, isMockMode, getAccessToken } from './api-client';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Auth API Service
@@ -22,8 +22,11 @@ const AUTH_ENDPOINTS = {
 // Mock Handlers
 // ============================================
 
+// Track current logged-in user ID from token
+let currentLoggedInUserId: string | null = null;
+
 function mockLogin(request: LoginRequest): OperationResult<LoginResponse> {
-  const user = mockUsers.find(u => u.email === request.email);
+  const user = mockStore.users.find(u => u.email === request.email);
 
   if (!user) {
     return createErrorResult(
@@ -32,6 +35,9 @@ function mockLogin(request: LoginRequest): OperationResult<LoginResponse> {
       401
     );
   }
+
+  // Track current user
+  currentLoggedInUserId = user.id;
 
   // In mock mode, accept any password
   const response: LoginResponse = {
@@ -45,7 +51,7 @@ function mockLogin(request: LoginRequest): OperationResult<LoginResponse> {
 }
 
 function mockRegister(request: RegisterRequest): OperationResult<User> {
-  const existingUser = mockUsers.find(u => u.email === request.email);
+  const existingUser = mockStore.users.find(u => u.email === request.email);
 
   if (existingUser) {
     return createErrorResult(
@@ -66,11 +72,40 @@ function mockRegister(request: RegisterRequest): OperationResult<User> {
     updatedAt: new Date().toISOString(),
   };
 
+  mockStore.users.push(newUser);
   return createSuccessResult(newUser, 201);
 }
 
 function mockGetCurrentUser(): OperationResult<User> {
-  return createSuccessResult(mockCurrentUser);
+  // Try to get user ID from token
+  const token = getAccessToken();
+  if (token) {
+    // Extract user ID from mock token format: mock-access-token-{userId}-{timestamp}
+    const parts = token.split('-');
+    if (parts.length >= 4) {
+      const userId = `${parts[3]}-${parts[4]}`; // user-1 format
+      const user = mockStore.users.find(u => u.id === userId);
+      if (user) {
+        return createSuccessResult(user);
+      }
+    }
+  }
+
+  // Fallback to tracked user or first user
+  if (currentLoggedInUserId) {
+    const user = mockStore.users.find(u => u.id === currentLoggedInUserId);
+    if (user) {
+      return createSuccessResult(user);
+    }
+  }
+
+  // Default to first user
+  const defaultUser = mockStore.users[0];
+  if (defaultUser) {
+    return createSuccessResult(defaultUser);
+  }
+
+  return createErrorResult(ErrorCodes.UNAUTHORIZED, 'Not authenticated', 401);
 }
 
 // ============================================
@@ -124,10 +159,14 @@ export async function refreshToken(request: RefreshTokenRequest): Promise<Operat
   if (isMockMode()) {
     await new Promise(resolve => setTimeout(resolve, 200));
 
+    // Get current user from token or fallback
+    const userResult = mockGetCurrentUser();
+    const user = userResult.isSuccess && userResult.data ? userResult.data : mockStore.users[0];
+
     const response: LoginResponse = {
-      user: mockCurrentUser,
-      accessToken: `mock-access-token-refreshed-${Date.now()}`,
-      refreshToken: `mock-refresh-token-refreshed-${Date.now()}`,
+      user,
+      accessToken: `mock-access-token-${user.id}-${Date.now()}`,
+      refreshToken: `mock-refresh-token-${user.id}-${Date.now()}`,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
@@ -157,7 +196,7 @@ export async function forgotPassword(email: string): Promise<OperationResult<nul
   if (isMockMode()) {
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const user = mockUsers.find(u => u.email === email);
+    const user = mockStore.users.find(u => u.email === email);
     if (!user) {
       // Don't reveal if email exists or not for security
       return createSuccessResult(null);

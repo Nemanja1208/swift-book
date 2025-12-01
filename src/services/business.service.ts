@@ -1,7 +1,7 @@
 import { OperationResult, createSuccessResult, createErrorResult, createNotFoundResult, ErrorCodes } from '@/types/api';
 import { Business, CreateBusinessRequest, UpdateBusinessRequest, PaginatedResult, PaginationParams } from '@/types';
 import { apiGet, apiPost, apiPut, apiDelete, isMockMode } from './api-client';
-import { mockBusinesses, mockCurrentBusiness } from './mock-data';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Business API Service
@@ -14,9 +14,6 @@ const BUSINESS_ENDPOINTS = {
   MY_BUSINESSES: '/businesses/my',
 } as const;
 
-// Local mock data store (for mutations during session)
-let localMockBusinesses = [...mockBusinesses];
-
 // ============================================
 // Mock Handlers
 // ============================================
@@ -27,21 +24,21 @@ function mockGetAllBusinesses(params?: PaginationParams): OperationResult<Pagina
   const startIndex = (page - 1) * pageSize;
   const endIndex = startIndex + pageSize;
 
-  const items = localMockBusinesses.slice(startIndex, endIndex);
+  const items = mockStore.businesses.slice(startIndex, endIndex);
 
   return createSuccessResult({
     items,
-    totalCount: localMockBusinesses.length,
+    totalCount: mockStore.businesses.length,
     page,
     pageSize,
-    totalPages: Math.ceil(localMockBusinesses.length / pageSize),
-    hasNextPage: endIndex < localMockBusinesses.length,
+    totalPages: Math.ceil(mockStore.businesses.length / pageSize),
+    hasNextPage: endIndex < mockStore.businesses.length,
     hasPreviousPage: page > 1,
   });
 }
 
 function mockGetBusinessById(id: string): OperationResult<Business> {
-  const business = localMockBusinesses.find(b => b.id === id);
+  const business = mockStore.businesses.find(b => b.id === id);
 
   if (!business) {
     return createNotFoundResult('Business');
@@ -51,7 +48,7 @@ function mockGetBusinessById(id: string): OperationResult<Business> {
 }
 
 function mockGetBusinessBySlug(slug: string): OperationResult<Business> {
-  const business = localMockBusinesses.find(b => b.slug === slug);
+  const business = mockStore.businesses.find(b => b.slug === slug);
 
   if (!business) {
     return createNotFoundResult('Business');
@@ -62,13 +59,13 @@ function mockGetBusinessBySlug(slug: string): OperationResult<Business> {
 
 function mockGetMyBusinesses(): OperationResult<Business[]> {
   // In mock mode, return all businesses as "owned" by current user
-  return createSuccessResult(localMockBusinesses);
+  return createSuccessResult(mockStore.businesses);
 }
 
 function mockCreateBusiness(request: CreateBusinessRequest): OperationResult<Business> {
   const slug = request.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-  const existingSlug = localMockBusinesses.find(b => b.slug === slug);
+  const existingSlug = mockStore.businesses.find(b => b.slug === slug);
   if (existingSlug) {
     return createErrorResult(
       ErrorCodes.BUSINESS_SLUG_EXISTS,
@@ -92,35 +89,35 @@ function mockCreateBusiness(request: CreateBusinessRequest): OperationResult<Bus
     updatedAt: new Date().toISOString(),
   };
 
-  localMockBusinesses.push(newBusiness);
+  mockStore.businesses.push(newBusiness);
   return createSuccessResult(newBusiness, 201);
 }
 
 function mockUpdateBusiness(id: string, request: UpdateBusinessRequest): OperationResult<Business> {
-  const index = localMockBusinesses.findIndex(b => b.id === id);
+  const index = mockStore.businesses.findIndex(b => b.id === id);
 
   if (index === -1) {
     return createNotFoundResult('Business');
   }
 
   const updatedBusiness: Business = {
-    ...localMockBusinesses[index],
+    ...mockStore.businesses[index],
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
-  localMockBusinesses[index] = updatedBusiness;
+  mockStore.businesses[index] = updatedBusiness;
   return createSuccessResult(updatedBusiness);
 }
 
 function mockDeleteBusiness(id: string): OperationResult<null> {
-  const index = localMockBusinesses.findIndex(b => b.id === id);
+  const index = mockStore.businesses.findIndex(b => b.id === id);
 
   if (index === -1) {
     return createNotFoundResult('Business');
   }
 
-  localMockBusinesses.splice(index, 1);
+  mockStore.businesses.splice(index, 1);
   return createSuccessResult(null);
 }
 
@@ -169,7 +166,12 @@ export async function getMyBusinesses(): Promise<OperationResult<Business[]>> {
 export async function getCurrentBusiness(): Promise<OperationResult<Business>> {
   if (isMockMode()) {
     await new Promise(resolve => setTimeout(resolve, 200));
-    return createSuccessResult(mockCurrentBusiness);
+    // Return the first business as the "current" one
+    const currentBusiness = mockStore.businesses[0];
+    if (!currentBusiness) {
+      return createNotFoundResult('Business');
+    }
+    return createSuccessResult(currentBusiness);
   }
 
   // In real implementation, this would get the current active business from context/session
