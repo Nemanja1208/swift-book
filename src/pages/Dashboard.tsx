@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronRight,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDashboardStats } from "@/services";
@@ -21,31 +22,48 @@ import { format } from "date-fns";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, logout, isLoggedIn } = useAuth();
+  const location = useLocation();
+  const { user, logout } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      navigate("/login");
-      return;
+  const loadDashboard = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
     }
 
-    loadDashboard();
-  }, [isLoggedIn, navigate]);
-
-  const loadDashboard = async () => {
-    setIsLoading(true);
     const result = await getDashboardStats("business-1");
     if (isSuccessResult(result)) {
       setStats(result.data);
     }
+
     setIsLoading(false);
-  };
+    setIsRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  // Refresh when navigating back from booking confirmation
+  useEffect(() => {
+    if (location.state?.refresh) {
+      loadDashboard(true);
+      // Clear the state to prevent refresh on subsequent renders
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, loadDashboard, navigate, location.pathname]);
 
   const handleLogout = async () => {
     await logout();
-    navigate("/login");
+    navigate("/landing");
+  };
+
+  const handleRefresh = () => {
+    loadDashboard(true);
   };
 
   const getStatusColor = (status: Booking["status"]) => {
@@ -101,10 +119,16 @@ const Dashboard = () => {
               Overview of your business performance
             </p>
           </div>
-          <Button onClick={() => navigate("/bookings/new")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Booking
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button onClick={() => navigate("/bookings/new")}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Booking
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

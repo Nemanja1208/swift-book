@@ -8,7 +8,7 @@ import {
   PaginationParams,
 } from '@/types';
 import { apiGet, apiPost, apiPut, apiDelete, isMockMode } from './api-client';
-import { mockServices, mockServiceCategories } from './mock-data';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Service API Service
@@ -22,10 +22,6 @@ const SERVICE_ENDPOINTS = {
     `/businesses/${businessId}/service-categories/${categoryId}`,
 } as const;
 
-// Local mock data store
-let localMockServices = [...mockServices];
-let localMockCategories = [...mockServiceCategories];
-
 // ============================================
 // Mock Handlers
 // ============================================
@@ -34,7 +30,7 @@ function mockGetAllServices(
   businessId: string,
   params?: PaginationParams & { categoryId?: string }
 ): OperationResult<PaginatedResult<Service>> {
-  let servicesForBusiness = localMockServices.filter(s => s.businessId === businessId);
+  let servicesForBusiness = mockStore.services.filter(s => s.businessId === businessId);
 
   if (params?.categoryId) {
     servicesForBusiness = servicesForBusiness.filter(s => s.categoryId === params.categoryId);
@@ -59,7 +55,7 @@ function mockGetAllServices(
 }
 
 function mockGetServiceById(businessId: string, serviceId: string): OperationResult<Service> {
-  const service = localMockServices.find(s => s.id === serviceId && s.businessId === businessId);
+  const service = mockStore.services.find(s => s.id === serviceId && s.businessId === businessId);
 
   if (!service) {
     return createNotFoundResult('Service');
@@ -87,7 +83,7 @@ function mockCreateService(businessId: string, request: CreateServiceRequest): O
     updatedAt: new Date().toISOString(),
   };
 
-  localMockServices.push(newService);
+  mockStore.services.push(newService);
   return createSuccessResult(newService, 201);
 }
 
@@ -96,35 +92,35 @@ function mockUpdateService(
   serviceId: string,
   request: UpdateServiceRequest
 ): OperationResult<Service> {
-  const index = localMockServices.findIndex(s => s.id === serviceId && s.businessId === businessId);
+  const index = mockStore.services.findIndex(s => s.id === serviceId && s.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Service');
   }
 
   const updatedService: Service = {
-    ...localMockServices[index],
+    ...mockStore.services[index],
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
-  localMockServices[index] = updatedService;
+  mockStore.services[index] = updatedService;
   return createSuccessResult(updatedService);
 }
 
 function mockDeleteService(businessId: string, serviceId: string): OperationResult<null> {
-  const index = localMockServices.findIndex(s => s.id === serviceId && s.businessId === businessId);
+  const index = mockStore.services.findIndex(s => s.id === serviceId && s.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Service');
   }
 
-  localMockServices.splice(index, 1);
+  mockStore.services.splice(index, 1);
   return createSuccessResult(null);
 }
 
 function mockGetAllCategories(businessId: string): OperationResult<ServiceCategory[]> {
-  const categories = localMockCategories.filter(c => c.businessId === businessId);
+  const categories = mockStore.serviceCategories.filter(c => c.businessId === businessId);
   return createSuccessResult(categories);
 }
 
@@ -132,7 +128,7 @@ function mockCreateCategory(
   businessId: string,
   request: { name: string; description?: string }
 ): OperationResult<ServiceCategory> {
-  const maxSortOrder = Math.max(...localMockCategories.map(c => c.sortOrder), 0);
+  const maxSortOrder = Math.max(...mockStore.serviceCategories.map(c => c.sortOrder), 0);
 
   const newCategory: ServiceCategory = {
     id: `category-${Date.now()}`,
@@ -145,7 +141,7 @@ function mockCreateCategory(
     updatedAt: new Date().toISOString(),
   };
 
-  localMockCategories.push(newCategory);
+  mockStore.serviceCategories.push(newCategory);
   return createSuccessResult(newCategory, 201);
 }
 
@@ -154,30 +150,30 @@ function mockUpdateCategory(
   categoryId: string,
   request: { name?: string; description?: string; sortOrder?: number; isActive?: boolean }
 ): OperationResult<ServiceCategory> {
-  const index = localMockCategories.findIndex(c => c.id === categoryId && c.businessId === businessId);
+  const index = mockStore.serviceCategories.findIndex(c => c.id === categoryId && c.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Service Category');
   }
 
   const updatedCategory: ServiceCategory = {
-    ...localMockCategories[index],
+    ...mockStore.serviceCategories[index],
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
-  localMockCategories[index] = updatedCategory;
+  mockStore.serviceCategories[index] = updatedCategory;
   return createSuccessResult(updatedCategory);
 }
 
 function mockDeleteCategory(businessId: string, categoryId: string): OperationResult<null> {
-  const index = localMockCategories.findIndex(c => c.id === categoryId && c.businessId === businessId);
+  const index = mockStore.serviceCategories.findIndex(c => c.id === categoryId && c.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Service Category');
   }
 
-  localMockCategories.splice(index, 1);
+  mockStore.serviceCategories.splice(index, 1);
   return createSuccessResult(null);
 }
 
@@ -203,7 +199,7 @@ export async function getAllServices(
 export async function getServiceList(businessId: string): Promise<OperationResult<Service[]>> {
   if (isMockMode()) {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const services = localMockServices.filter(s => s.businessId === businessId && s.isActive);
+    const services = mockStore.services.filter(s => s.businessId === businessId && s.isActive);
     return createSuccessResult(services);
   }
 

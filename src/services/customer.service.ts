@@ -1,7 +1,7 @@
 import { OperationResult, createSuccessResult, createErrorResult, createNotFoundResult, ErrorCodes } from '@/types/api';
 import { Customer, CreateCustomerRequest, UpdateCustomerRequest, PaginatedResult, PaginationParams } from '@/types';
 import { apiGet, apiPost, apiPut, apiDelete, isMockMode } from './api-client';
-import { mockCustomers } from './mock-data';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Customer API Service
@@ -13,9 +13,6 @@ const CUSTOMER_ENDPOINTS = {
   SEARCH: (businessId: string) => `/businesses/${businessId}/customers/search`,
 } as const;
 
-// Local mock data store
-let localMockCustomers = [...mockCustomers];
-
 // ============================================
 // Mock Handlers
 // ============================================
@@ -24,7 +21,7 @@ function mockGetAllCustomers(
   businessId: string,
   params?: PaginationParams & { search?: string; tags?: string[] }
 ): OperationResult<PaginatedResult<Customer>> {
-  let customersForBusiness = localMockCustomers.filter(c => c.businessId === businessId);
+  let customersForBusiness = mockStore.customers.filter(c => c.businessId === businessId);
 
   // Apply search filter
   if (params?.search) {
@@ -71,7 +68,7 @@ function mockGetAllCustomers(
 }
 
 function mockGetCustomerById(businessId: string, customerId: string): OperationResult<Customer> {
-  const customer = localMockCustomers.find(c => c.id === customerId && c.businessId === businessId);
+  const customer = mockStore.customers.find(c => c.id === customerId && c.businessId === businessId);
 
   if (!customer) {
     return createNotFoundResult('Customer');
@@ -85,7 +82,7 @@ function mockSearchCustomers(
   query: string
 ): OperationResult<Customer[]> {
   const queryLower = query.toLowerCase();
-  const customers = localMockCustomers.filter(
+  const customers = mockStore.customers.filter(
     c =>
       c.businessId === businessId &&
       (c.firstName.toLowerCase().includes(queryLower) ||
@@ -101,7 +98,7 @@ function mockCreateCustomer(
   businessId: string,
   request: CreateCustomerRequest
 ): OperationResult<Customer> {
-  const existingCustomer = localMockCustomers.find(
+  const existingCustomer = mockStore.customers.find(
     c => c.businessId === businessId && c.email === request.email
   );
 
@@ -128,7 +125,7 @@ function mockCreateCustomer(
     updatedAt: new Date().toISOString(),
   };
 
-  localMockCustomers.push(newCustomer);
+  mockStore.addCustomer(newCustomer);
   return createSuccessResult(newCustomer, 201);
 }
 
@@ -137,15 +134,15 @@ function mockUpdateCustomer(
   customerId: string,
   request: UpdateCustomerRequest
 ): OperationResult<Customer> {
-  const index = localMockCustomers.findIndex(c => c.id === customerId && c.businessId === businessId);
+  const index = mockStore.customers.findIndex(c => c.id === customerId && c.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Customer');
   }
 
   // Check email uniqueness if email is being updated
-  if (request.email && request.email !== localMockCustomers[index].email) {
-    const existingCustomer = localMockCustomers.find(
+  if (request.email && request.email !== mockStore.customers[index].email) {
+    const existingCustomer = mockStore.customers.find(
       c => c.businessId === businessId && c.email === request.email && c.id !== customerId
     );
 
@@ -159,23 +156,23 @@ function mockUpdateCustomer(
   }
 
   const updatedCustomer: Customer = {
-    ...localMockCustomers[index],
+    ...mockStore.customers[index],
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
-  localMockCustomers[index] = updatedCustomer;
+  mockStore.customers[index] = updatedCustomer;
   return createSuccessResult(updatedCustomer);
 }
 
 function mockDeleteCustomer(businessId: string, customerId: string): OperationResult<null> {
-  const index = localMockCustomers.findIndex(c => c.id === customerId && c.businessId === businessId);
+  const index = mockStore.customers.findIndex(c => c.id === customerId && c.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Customer');
   }
 
-  localMockCustomers.splice(index, 1);
+  mockStore.customers.splice(index, 1);
   return createSuccessResult(null);
 }
 

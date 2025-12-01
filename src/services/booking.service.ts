@@ -16,9 +16,10 @@ import {
   PaginatedResult,
   PaginationParams,
   BookingStatus,
+  Customer,
 } from '@/types';
 import { apiGet, apiPost, apiPut, apiPatch, isMockMode } from './api-client';
-import { mockBookings, mockServices, mockStaff, mockCustomers } from './mock-data';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Booking API Service
@@ -34,9 +35,6 @@ const BOOKING_ENDPOINTS = {
   AVAILABILITY: (businessId: string) => `/businesses/${businessId}/availability`,
 } as const;
 
-// Local mock data store
-let localMockBookings = [...mockBookings];
-
 // ============================================
 // Mock Handlers
 // ============================================
@@ -51,7 +49,7 @@ function mockGetAllBookings(
     endDate?: string;
   }
 ): OperationResult<PaginatedResult<Booking>> {
-  let bookingsForBusiness = localMockBookings.filter(b => b.businessId === businessId);
+  let bookingsForBusiness = mockStore.bookings.filter(b => b.businessId === businessId);
 
   // Apply filters
   if (params?.status) {
@@ -100,7 +98,7 @@ function mockGetAllBookings(
 }
 
 function mockGetBookingById(businessId: string, bookingId: string): OperationResult<Booking> {
-  const booking = localMockBookings.find(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
   if (!booking) {
     return createNotFoundResult('Booking');
@@ -113,7 +111,7 @@ function mockGetAvailability(
   businessId: string,
   request: AvailabilityRequest
 ): OperationResult<AvailabilityResponse> {
-  const service = mockServices.find(s => s.id === request.serviceId);
+  const service = mockStore.services.find(s => s.id === request.serviceId);
 
   if (!service) {
     return createNotFoundResult('Service');
@@ -131,7 +129,7 @@ function mockGetAvailability(
     const endTime = new Date(startTime.getTime() + service.durationMinutes * 60 * 1000);
 
     // Check if slot overlaps with existing bookings
-    const isBooked = localMockBookings.some(
+    const isBooked = mockStore.bookings.some(
       b =>
         b.businessId === businessId &&
         b.status !== 'cancelled' &&
@@ -154,12 +152,12 @@ function mockGetAvailability(
 }
 
 function mockCreateBooking(businessId: string, request: CreateBookingRequest): OperationResult<Booking> {
-  const service = mockServices.find(s => s.id === request.serviceId);
+  const service = mockStore.services.find(s => s.id === request.serviceId);
   if (!service) {
     return createNotFoundResult('Service');
   }
 
-  const staff = mockStaff.find(s => s.id === request.staffId);
+  const staff = mockStore.staff.find(s => s.id === request.staffId);
   if (!staff) {
     return createNotFoundResult('Staff member');
   }
@@ -168,7 +166,7 @@ function mockCreateBooking(businessId: string, request: CreateBookingRequest): O
   const startTime = new Date(request.startTime);
   const endTime = new Date(startTime.getTime() + service.durationMinutes * 60 * 1000);
 
-  const hasConflict = localMockBookings.some(
+  const hasConflict = mockStore.bookings.some(
     b =>
       b.businessId === businessId &&
       b.staffId === request.staffId &&
@@ -186,32 +184,47 @@ function mockCreateBooking(businessId: string, request: CreateBookingRequest): O
   }
 
   // Find or create customer
-  let customer = mockCustomers.find(c => c.id === request.customerId);
+  let customer: Customer | undefined = mockStore.customers.find(c => c.id === request.customerId);
 
   if (!customer && request.customerEmail) {
-    customer = {
-      id: `customer-${Date.now()}`,
-      businessId,
-      email: request.customerEmail,
-      firstName: request.customerFirstName || '',
-      lastName: request.customerLastName || '',
-      phoneNumber: request.customerPhoneNumber,
-      totalBookings: 0,
-      totalSpent: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // Check if customer with this email exists
+    customer = mockStore.findCustomerByEmail(request.customerEmail);
+
+    if (!customer) {
+      // Create new customer
+      customer = {
+        id: `customer-${Date.now()}`,
+        businessId,
+        email: request.customerEmail,
+        firstName: request.customerFirstName || '',
+        lastName: request.customerLastName || '',
+        phoneNumber: request.customerPhoneNumber,
+        totalBookings: 0,
+        totalSpent: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      mockStore.addCustomer(customer);
+    }
+  }
+
+  if (!customer) {
+    return createErrorResult(
+      ErrorCodes.CUSTOMER_NOT_FOUND,
+      'Customer information is required',
+      400
+    );
   }
 
   const newBooking: Booking = {
     id: `booking-${Date.now()}`,
     businessId,
-    customerId: customer?.id || request.customerId!,
+    customerId: customer.id,
     staffId: request.staffId,
     serviceId: request.serviceId,
     startTime: startTime.toISOString(),
     endTime: endTime.toISOString(),
-    status: 'pending',
+    status: 'confirmed', // Auto-confirm for now
     notes: request.notes,
     price: service.price,
     currency: service.currency,
@@ -222,7 +235,14 @@ function mockCreateBooking(businessId: string, request: CreateBookingRequest): O
     updatedAt: new Date().toISOString(),
   };
 
-  localMockBookings.push(newBooking);
+  // Add to store
+  mockStore.addBooking(newBooking);
+
+  // Update customer stats
+  customer.totalBookings += 1;
+  customer.totalSpent += service.price;
+  customer.lastVisitAt = startTime.toISOString();
+
   return createSuccessResult(newBooking, 201);
 }
 
@@ -231,13 +251,11 @@ function mockUpdateBooking(
   bookingId: string,
   request: UpdateBookingRequest
 ): OperationResult<Booking> {
-  const index = localMockBookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
-  if (index === -1) {
+  if (!booking) {
     return createNotFoundResult('Booking');
   }
-
-  const booking = localMockBookings[index];
 
   if (booking.status === 'cancelled' || booking.status === 'completed') {
     return createErrorResult(
@@ -250,10 +268,10 @@ function mockUpdateBooking(
   // Check availability if rescheduling
   if (request.startTime) {
     const startTime = new Date(request.startTime);
-    const service = mockServices.find(s => s.id === booking.serviceId);
+    const service = mockStore.services.find(s => s.id === booking.serviceId);
     const endTime = new Date(startTime.getTime() + (service?.durationMinutes || 60) * 60 * 1000);
 
-    const hasConflict = localMockBookings.some(
+    const hasConflict = mockStore.bookings.some(
       b =>
         b.id !== bookingId &&
         b.businessId === businessId &&
@@ -272,20 +290,22 @@ function mockUpdateBooking(
     }
   }
 
-  const updatedBooking: Booking = {
-    ...booking,
+  // Update booking in store
+  const updates: Partial<Booking> = {
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
   if (request.startTime && booking.service) {
-    updatedBooking.endTime = new Date(
+    updates.endTime = new Date(
       new Date(request.startTime).getTime() + booking.service.durationMinutes * 60 * 1000
     ).toISOString();
   }
 
-  localMockBookings[index] = updatedBooking;
-  return createSuccessResult(updatedBooking);
+  mockStore.updateBooking(bookingId, updates);
+
+  const updatedBooking = mockStore.getBookingById(bookingId);
+  return createSuccessResult(updatedBooking!);
 }
 
 function mockCancelBooking(
@@ -293,13 +313,11 @@ function mockCancelBooking(
   bookingId: string,
   request?: CancelBookingRequest
 ): OperationResult<Booking> {
-  const index = localMockBookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
-  if (index === -1) {
+  if (!booking) {
     return createNotFoundResult('Booking');
   }
-
-  const booking = localMockBookings[index];
 
   if (booking.status === 'cancelled') {
     return createErrorResult(
@@ -317,27 +335,24 @@ function mockCancelBooking(
     );
   }
 
-  const updatedBooking: Booking = {
-    ...booking,
+  mockStore.updateBooking(bookingId, {
     status: 'cancelled',
     cancellationReason: request?.reason,
     cancelledAt: new Date().toISOString(),
     cancelledBy: 'staff',
     updatedAt: new Date().toISOString(),
-  };
+  });
 
-  localMockBookings[index] = updatedBooking;
-  return createSuccessResult(updatedBooking);
+  const updatedBooking = mockStore.getBookingById(bookingId);
+  return createSuccessResult(updatedBooking!);
 }
 
 function mockConfirmBooking(businessId: string, bookingId: string): OperationResult<Booking> {
-  const index = localMockBookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
-  if (index === -1) {
+  if (!booking) {
     return createNotFoundResult('Booking');
   }
-
-  const booking = localMockBookings[index];
 
   if (booking.status !== 'pending') {
     return createErrorResult(
@@ -347,24 +362,21 @@ function mockConfirmBooking(businessId: string, bookingId: string): OperationRes
     );
   }
 
-  const updatedBooking: Booking = {
-    ...booking,
+  mockStore.updateBooking(bookingId, {
     status: 'confirmed',
     updatedAt: new Date().toISOString(),
-  };
+  });
 
-  localMockBookings[index] = updatedBooking;
-  return createSuccessResult(updatedBooking);
+  const updatedBooking = mockStore.getBookingById(bookingId);
+  return createSuccessResult(updatedBooking!);
 }
 
 function mockCompleteBooking(businessId: string, bookingId: string): OperationResult<Booking> {
-  const index = localMockBookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
-  if (index === -1) {
+  if (!booking) {
     return createNotFoundResult('Booking');
   }
-
-  const booking = localMockBookings[index];
 
   if (booking.status === 'cancelled') {
     return createErrorResult(
@@ -374,24 +386,21 @@ function mockCompleteBooking(businessId: string, bookingId: string): OperationRe
     );
   }
 
-  const updatedBooking: Booking = {
-    ...booking,
+  mockStore.updateBooking(bookingId, {
     status: 'completed',
     updatedAt: new Date().toISOString(),
-  };
+  });
 
-  localMockBookings[index] = updatedBooking;
-  return createSuccessResult(updatedBooking);
+  const updatedBooking = mockStore.getBookingById(bookingId);
+  return createSuccessResult(updatedBooking!);
 }
 
 function mockMarkNoShow(businessId: string, bookingId: string): OperationResult<Booking> {
-  const index = localMockBookings.findIndex(b => b.id === bookingId && b.businessId === businessId);
+  const booking = mockStore.bookings.find(b => b.id === bookingId && b.businessId === businessId);
 
-  if (index === -1) {
+  if (!booking) {
     return createNotFoundResult('Booking');
   }
-
-  const booking = localMockBookings[index];
 
   if (booking.status === 'cancelled' || booking.status === 'completed') {
     return createErrorResult(
@@ -401,14 +410,13 @@ function mockMarkNoShow(businessId: string, bookingId: string): OperationResult<
     );
   }
 
-  const updatedBooking: Booking = {
-    ...booking,
+  mockStore.updateBooking(bookingId, {
     status: 'no_show',
     updatedAt: new Date().toISOString(),
-  };
+  });
 
-  localMockBookings[index] = updatedBooking;
-  return createSuccessResult(updatedBooking);
+  const updatedBooking = mockStore.getBookingById(bookingId);
+  return createSuccessResult(updatedBooking!);
 }
 
 // ============================================

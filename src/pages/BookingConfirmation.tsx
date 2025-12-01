@@ -15,7 +15,6 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { getBookingById } from "@/services";
 import { Booking } from "@/types";
 import { isSuccessResult } from "@/types/api";
@@ -24,21 +23,15 @@ import { format } from "date-fns";
 const BookingConfirmation = () => {
   const navigate = useNavigate();
   const { bookingId } = useParams<{ bookingId: string }>();
-  const { isLoggedIn } = useAuth();
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      navigate("/login");
-      return;
-    }
-
     if (bookingId) {
       loadBooking();
     }
-  }, [isLoggedIn, bookingId, navigate]);
+  }, [bookingId]);
 
   const loadBooking = async () => {
     if (!bookingId) return;
@@ -238,7 +231,7 @@ const BookingConfirmation = () => {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/dashboard", { state: { refresh: true } })}
           >
             <Home className="h-4 w-4 mr-2" />
             Back to Dashboard

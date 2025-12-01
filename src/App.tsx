@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute, PublicRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -25,17 +26,65 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Root - redirects based on auth status */}
             <Route path="/" element={<Index />} />
-            <Route path="/landing" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/bookings/new" element={<NewBooking />} />
-            <Route path="/bookings/:bookingId/confirmation" element={<BookingConfirmation />} />
-            <Route path="/onboarding" element={<OnboardingLayout />}>
+
+            {/* Public routes - redirect to dashboard if logged in */}
+            <Route
+              path="/landing"
+              element={
+                <PublicRoute>
+                  <Landing />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <PublicRoute>
+                  <OnboardingLayout />
+                </PublicRoute>
+              }
+            >
               <Route index element={<Step1Account />} />
               <Route path="business" element={<Step2Business />} />
             </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+            {/* Protected routes - require authentication */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings/new"
+              element={
+                <ProtectedRoute>
+                  <NewBooking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings/:bookingId/confirmation"
+              element={
+                <ProtectedRoute>
+                  <BookingConfirmation />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Catch-all - 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -21,7 +21,6 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import {
   getServiceList,
   getStaffList,
@@ -38,7 +37,6 @@ type BookingStep = "service" | "staff" | "datetime" | "customer" | "confirm";
 
 const NewBooking = () => {
   const navigate = useNavigate();
-  const { isLoggedIn } = useAuth();
   const { toast } = useToast();
 
   // Step state
@@ -71,16 +69,12 @@ const NewBooking = () => {
   const [bookingNotes, setBookingNotes] = useState("");
 
   // Loading states
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      navigate("/login");
-      return;
-    }
     loadInitialData();
-  }, [isLoggedIn, navigate]);
+  }, []);
 
   useEffect(() => {
     if (selectedService && selectedStaff && selectedDate) {

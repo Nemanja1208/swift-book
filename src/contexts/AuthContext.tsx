@@ -21,29 +21,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check if user is already authenticated on mount
-    if (isAuthenticated()) {
-      refreshUser();
-    } else {
-      setIsLoading(false);
-    }
+    checkAuth();
   }, []);
 
-  const refreshUser = async () => {
+  const checkAuth = async () => {
     setIsLoading(true);
-    try {
-      const result = await authService.getCurrentUser();
-      if (isSuccessResult(result)) {
-        setUser(result.data);
-      } else {
+
+    if (isAuthenticated()) {
+      try {
+        const result = await authService.getCurrentUser();
+        if (isSuccessResult(result)) {
+          setUser(result.data);
+        } else {
+          // Token invalid, clear it
+          setUser(null);
+          clearTokens();
+        }
+      } catch {
         setUser(null);
         clearTokens();
       }
-    } catch {
+    } else {
       setUser(null);
-      clearTokens();
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
+  };
+
+  const refreshUser = async () => {
+    await checkAuth();
   };
 
   const login = async (request: LoginRequest): Promise<OperationResult<User>> => {

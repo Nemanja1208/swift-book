@@ -1,7 +1,7 @@
 import { OperationResult, createSuccessResult, createErrorResult, createNotFoundResult, ErrorCodes } from '@/types/api';
 import { Staff, CreateStaffRequest, UpdateStaffRequest, WorkingHours, PaginatedResult, PaginationParams } from '@/types';
 import { apiGet, apiPost, apiPut, apiDelete, isMockMode } from './api-client';
-import { mockStaff, mockWorkingHours } from './mock-data';
+import { mockStore } from './mock-store';
 
 // ============================================
 // Staff API Service
@@ -13,16 +13,12 @@ const STAFF_ENDPOINTS = {
   WORKING_HOURS: (businessId: string, staffId: string) => `/businesses/${businessId}/staff/${staffId}/working-hours`,
 } as const;
 
-// Local mock data store
-let localMockStaff = [...mockStaff];
-let localMockWorkingHours = [...mockWorkingHours];
-
 // ============================================
 // Mock Handlers
 // ============================================
 
 function mockGetAllStaff(businessId: string, params?: PaginationParams): OperationResult<PaginatedResult<Staff>> {
-  const staffForBusiness = localMockStaff.filter(s => s.businessId === businessId);
+  const staffForBusiness = mockStore.staff.filter(s => s.businessId === businessId);
   const page = params?.page || 1;
   const pageSize = params?.pageSize || 10;
   const startIndex = (page - 1) * pageSize;
@@ -42,7 +38,7 @@ function mockGetAllStaff(businessId: string, params?: PaginationParams): Operati
 }
 
 function mockGetStaffById(businessId: string, staffId: string): OperationResult<Staff> {
-  const staff = localMockStaff.find(s => s.id === staffId && s.businessId === businessId);
+  const staff = mockStore.staff.find(s => s.id === staffId && s.businessId === businessId);
 
   if (!staff) {
     return createNotFoundResult('Staff member');
@@ -52,7 +48,7 @@ function mockGetStaffById(businessId: string, staffId: string): OperationResult<
 }
 
 function mockCreateStaff(businessId: string, request: CreateStaffRequest): OperationResult<Staff> {
-  const existingStaff = localMockStaff.find(
+  const existingStaff = mockStore.staff.find(
     s => s.businessId === businessId && s.user?.email === request.email
   );
 
@@ -86,29 +82,29 @@ function mockCreateStaff(businessId: string, request: CreateStaffRequest): Opera
     updatedAt: new Date().toISOString(),
   };
 
-  localMockStaff.push(newStaff);
+  mockStore.staff.push(newStaff);
   return createSuccessResult(newStaff, 201);
 }
 
 function mockUpdateStaff(businessId: string, staffId: string, request: UpdateStaffRequest): OperationResult<Staff> {
-  const index = localMockStaff.findIndex(s => s.id === staffId && s.businessId === businessId);
+  const index = mockStore.staff.findIndex(s => s.id === staffId && s.businessId === businessId);
 
   if (index === -1) {
     return createNotFoundResult('Staff member');
   }
 
   const updatedStaff: Staff = {
-    ...localMockStaff[index],
+    ...mockStore.staff[index],
     ...request,
     updatedAt: new Date().toISOString(),
   };
 
-  localMockStaff[index] = updatedStaff;
+  mockStore.staff[index] = updatedStaff;
   return createSuccessResult(updatedStaff);
 }
 
 function mockDeleteStaff(businessId: string, staffId: string): OperationResult<null> {
-  const staff = localMockStaff.find(s => s.id === staffId && s.businessId === businessId);
+  const staff = mockStore.staff.find(s => s.id === staffId && s.businessId === businessId);
 
   if (!staff) {
     return createNotFoundResult('Staff member');
@@ -122,18 +118,19 @@ function mockDeleteStaff(businessId: string, staffId: string): OperationResult<n
     );
   }
 
-  localMockStaff = localMockStaff.filter(s => s.id !== staffId);
+  const index = mockStore.staff.findIndex(s => s.id === staffId);
+  mockStore.staff.splice(index, 1);
   return createSuccessResult(null);
 }
 
 function mockGetWorkingHours(staffId: string): OperationResult<WorkingHours[]> {
-  const hours = localMockWorkingHours.filter(h => h.staffId === staffId);
+  const hours = mockStore.workingHours.filter(h => h.staffId === staffId);
   return createSuccessResult(hours);
 }
 
 function mockUpdateWorkingHours(staffId: string, hours: WorkingHours[]): OperationResult<WorkingHours[]> {
   // Remove existing hours for this staff
-  localMockWorkingHours = localMockWorkingHours.filter(h => h.staffId !== staffId);
+  mockStore.workingHours = mockStore.workingHours.filter(h => h.staffId !== staffId);
 
   // Add updated hours
   const updatedHours = hours.map(h => ({
@@ -142,7 +139,7 @@ function mockUpdateWorkingHours(staffId: string, hours: WorkingHours[]): Operati
     updatedAt: new Date().toISOString(),
   }));
 
-  localMockWorkingHours.push(...updatedHours);
+  mockStore.workingHours.push(...updatedHours);
   return createSuccessResult(updatedHours);
 }
 
@@ -168,7 +165,7 @@ export async function getAllStaff(
 export async function getStaffList(businessId: string): Promise<OperationResult<Staff[]>> {
   if (isMockMode()) {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const staffForBusiness = localMockStaff.filter(s => s.businessId === businessId);
+    const staffForBusiness = mockStore.staff.filter(s => s.businessId === businessId);
     return createSuccessResult(staffForBusiness);
   }
 

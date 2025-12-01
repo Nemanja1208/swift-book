@@ -1,14 +1,24 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const navigate = useNavigate();
+  const { isLoggedIn, isLoading } = useAuth();
 
-  useEffect(() => {
-    navigate("/landing");
-  }, [navigate]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  return null;
+  // If logged in, go to dashboard; otherwise, go to landing page
+  if (isLoggedIn) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Navigate to="/landing" replace />;
 };
 
 export default Index;
