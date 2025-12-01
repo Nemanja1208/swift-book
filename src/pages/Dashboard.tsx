@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  Scissors,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDashboardStats } from "@/services";
@@ -324,7 +326,7 @@ const Dashboard = () => {
               className="h-24 flex-col gap-2"
               onClick={() => navigate("/services")}
             >
-              <Calendar className="h-6 w-6" />
+              <Scissors className="h-6 w-6" />
               <span>Services</span>
             </Button>
             <Button
@@ -332,7 +334,7 @@ const Dashboard = () => {
               className="h-24 flex-col gap-2"
               onClick={() => navigate("/settings")}
             >
-              <Clock className="h-6 w-6" />
+              <Settings className="h-6 w-6" />
               <span>Settings</span>
             </Button>
           </div>

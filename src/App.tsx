@@ -11,6 +11,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NewBooking from "./pages/NewBooking";
 import BookingConfirmation from "./pages/BookingConfirmation";
+import Services from "./pages/Services";
+import Customers from "./pages/Customers";
+import Settings from "./pages/Settings";
 import OnboardingLayout from "./pages/onboarding/OnboardingLayout";
 import Step1Account from "./pages/onboarding/Step1Account";
 import Step2Business from "./pages/onboarding/Step2Business";
@@ -80,6 +83,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BookingConfirmation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/services"
+              element={
+                <ProtectedRoute>
+                  <Services />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute>
+                  <Customers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />
