@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,13 +27,7 @@ const BookingConfirmation = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (bookingId) {
-      loadBooking();
-    }
-  }, [bookingId]);
-
-  const loadBooking = async () => {
+  const loadBooking = useCallback(async () => {
     if (!bookingId) return;
 
     setIsLoading(true);
@@ -43,7 +37,13 @@ const BookingConfirmation = () => {
       setBooking(result.data);
     }
     setIsLoading(false);
-  };
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (bookingId) {
+      loadBooking();
+    }
+  }, [bookingId, loadBooking]);
 
   if (isLoading) {
     return (

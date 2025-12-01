@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,25 +72,7 @@ const NewBooking = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedService && selectedStaff && selectedDate) {
-      loadAvailability();
-    }
-  }, [selectedService, selectedStaff, selectedDate]);
-
-  useEffect(() => {
-    if (customerSearch.length >= 2) {
-      searchCustomersDebounced(customerSearch);
-    } else {
-      setCustomerSearchResults([]);
-    }
-  }, [customerSearch]);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     const [servicesResult, staffResult] = await Promise.all([
       getServiceList("business-1"),
@@ -104,9 +86,9 @@ const NewBooking = () => {
       setStaff(staffResult.data);
     }
     setIsLoading(false);
-  };
+  }, []);
 
-  const loadAvailability = async () => {
+  const loadAvailability = useCallback(async () => {
     if (!selectedService) return;
 
     const result = await getAvailability("business-1", {
@@ -118,14 +100,32 @@ const NewBooking = () => {
     if (isSuccessResult(result)) {
       setAvailableSlots(result.data.slots);
     }
-  };
+  }, [selectedService, selectedStaff?.id, selectedDate]);
 
-  const searchCustomersDebounced = async (query: string) => {
+  const searchCustomersDebounced = useCallback(async (query: string) => {
     const result = await searchCustomers("business-1", query);
     if (isSuccessResult(result)) {
       setCustomerSearchResults(result.data);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    if (selectedService && selectedStaff && selectedDate) {
+      loadAvailability();
+    }
+  }, [selectedService, selectedStaff, selectedDate, loadAvailability]);
+
+  useEffect(() => {
+    if (customerSearch.length >= 2) {
+      searchCustomersDebounced(customerSearch);
+    } else {
+      setCustomerSearchResults([]);
+    }
+  }, [customerSearch, searchCustomersDebounced]);
 
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
